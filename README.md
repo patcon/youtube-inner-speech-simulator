@@ -8,18 +8,28 @@ The token budget for each thought is proportional to the duration of the transcr
 
 ## Usage
 
+The script uses [uv](https://docs.astral.sh/uv/) inline metadata, so no separate install step is needed:
+
+```bash
+export ANTHROPIC_API_KEY=sk-...
+
+uv run create_inner_speech.py transcript.vtt personas.yaml --output-dir ./output --verbose
+```
+
+Or the traditional way:
+
 ```bash
 pip install anthropic pyyaml
 export ANTHROPIC_API_KEY=sk-...
 
-python inner_speech.py transcript.vtt personas.yaml --output-dir ./output --verbose
+python create_inner_speech.py transcript.vtt personas.yaml --output-dir ./output --verbose
 ```
 
 This produces one file per persona in the output directory, e.g. `inner_no_apologies_right.vtt`, with the same timestamps as the source transcript.
 
 ## Files
 
-- `inner_speech.py` — main script
+- `create_inner_speech.py` — main script
 - `personas.yaml` — persona configs and token budget settings
 
 ## Persona config

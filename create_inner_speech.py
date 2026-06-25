@@ -1,9 +1,16 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#   "anthropic",
+#   "pyyaml",
+# ]
+# ///
 """
 Generate inner speech VTT streams for personas, seeded from a source VTT transcript.
 
 Usage:
-    python inner_speech.py transcript.vtt personas.yaml --output-dir ./output
+    uv run create_inner_speech.py transcript.vtt personas.yaml --output-dir ./output
 """
 
 import argparse
