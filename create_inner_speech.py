@@ -267,9 +267,6 @@ def main() -> None:
     parser.add_argument("--yes", "-y", action="store_true", help="Skip confirmation prompt")
     args = parser.parse_args()
 
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("Error: ANTHROPIC_API_KEY is not set. Get a key at https://console.anthropic.com/ and run:\n  export ANTHROPIC_API_KEY=sk-...", file=sys.stderr)
-        sys.exit(1)
     if not args.vtt.exists():
         print(f"Error: VTT file not found: {args.vtt}", file=sys.stderr)
         sys.exit(1)
@@ -296,6 +293,10 @@ def main() -> None:
 
     total_calls = len(cues) * len(config.personas)
     print(f"\nThis will make {total_calls} API call(s) ({len(cues)} cues × {len(config.personas)} persona(s)).")
+
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        print("Error: ANTHROPIC_API_KEY is not set. Get a key at https://console.anthropic.com/ and run:\n  export ANTHROPIC_API_KEY=sk-...", file=sys.stderr)
+        sys.exit(1)
 
     print("Estimating token usage...", end=" ", flush=True)
     client = anthropic.Anthropic()
