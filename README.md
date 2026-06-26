@@ -17,7 +17,7 @@ The script uses [uv](https://docs.astral.sh/uv/) inline metadata, so no separate
 ```bash
 export ANTHROPIC_API_KEY=sk-...
 
-uv run create_inner_speech.py transcript.vtt personas.yaml --output-dir ./output --verbose
+uv run create_inner_speech.py transcripts/samples/my-talk.vtt personas/default.yml --verbose
 ```
 
 Or the traditional way:
@@ -26,15 +26,17 @@ Or the traditional way:
 pip install anthropic pyyaml
 export ANTHROPIC_API_KEY=sk-...
 
-python create_inner_speech.py transcript.vtt personas.yaml --output-dir ./output --verbose
+python create_inner_speech.py transcripts/samples/my-talk.vtt personas/default.yml --verbose
 ```
 
-This produces one file per persona in the output directory, e.g. `inner_no_apologies_right.vtt`, with the same timestamps as the source transcript.
+Output VTTs go to `outputs/` by default, one file per persona (e.g. `outputs/inner_no_apologies_right.vtt`), with the same timestamps as the source transcript.
 
 ## Files
 
 - `create_inner_speech.py` — main script
-- `personas.yaml` — persona configs and token budget settings
+- `personas/default.yml` — a simple starter persona
+- `personas/pew-typologies-2026.yml` — all nine groups from the [Pew Research 2026 Political Typology](https://www.pewresearch.org/politics/2026/06/10/beyond-red-vs-blue-the-political-typology/), grounded in biographical personas rather than abstract trait lists
+- `transcripts/samples/` — sample VTT transcripts (tracked by git; all other `.vtt` files are ignored)
 
 ## Persona config
 
@@ -48,8 +50,6 @@ personas:
     prompt: >
       Describe the listener in concrete biographical terms...
 ```
-
-The included `personas.yaml` contains all nine groups from the [Pew Research 2026 Political Typology](https://www.pewresearch.org/politics/2026/06/10/beyond-red-vs-blue-the-political-typology/), grounded in biographical personas rather than abstract trait lists.
 
 ## How it works
 

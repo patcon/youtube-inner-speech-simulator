@@ -260,7 +260,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Generate inner speech VTTs from a transcript.")
     parser.add_argument("vtt", type=Path, help="Source VTT transcript file")
     parser.add_argument("personas", type=Path, help="Personas YAML config file")
-    parser.add_argument("--output-dir", type=Path, default=Path("."), help="Output directory")
+    parser.add_argument("--output-dir", type=Path, default=Path("outputs"), help="Output directory")
     parser.add_argument("--verbose", "-v", action="store_true", help="Print each thought as it's generated")
     parser.add_argument("--only", metavar="PERSONA", nargs="+", help="Run only these persona name(s)")
     parser.add_argument("--max-time", type=float, metavar="SECONDS", help="Only process cues up to this timestamp (seconds)")
