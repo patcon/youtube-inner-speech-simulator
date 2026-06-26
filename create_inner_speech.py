@@ -262,6 +262,9 @@ def main() -> None:
     parser.add_argument("personas", type=Path, help="Personas YAML config file")
     parser.add_argument("--output-dir", type=Path, default=Path("."), help="Output directory")
     parser.add_argument("--verbose", "-v", action="store_true", help="Print each thought as it's generated")
+    parser.add_argument("--only", metavar="PERSONA", nargs="+", help="Run only these persona name(s)")
+    parser.add_argument("--max-time", type=float, metavar="SECONDS", help="Only process cues up to this timestamp (seconds)")
+    parser.add_argument("--yes", "-y", action="store_true", help="Skip confirmation prompt")
     args = parser.parse_args()
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
@@ -277,11 +280,27 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     cues = parse_vtt(args.vtt)
-    print(f"Parsed {len(cues)} cues from {args.vtt.name}")
+    if args.max_time is not None:
+        cues = [c for c in cues if c.start < args.max_time]
+    print(f"Parsed {len(cues)} cues from {args.vtt.name}" + (f" (capped at {args.max_time}s)" if args.max_time else ""))
 
     config = load_config(args.personas)
+    if args.only:
+        unknown = set(args.only) - {p.name for p in config.personas}
+        if unknown:
+            print(f"Error: unknown persona(s): {sorted(unknown)}", file=sys.stderr)
+            sys.exit(1)
+        config.personas = [p for p in config.personas if p.name in args.only]
     print(f"Loaded {len(config.personas)} persona(s): {[p.name for p in config.personas]}")
     print(f"Budget: {config.tokens_per_second} tok/sec, min={config.min_tokens}, max={config.max_tokens}")
+
+    total_calls = len(cues) * len(config.personas)
+    print(f"\nThis will make {total_calls} API call(s) ({len(cues)} cues × {len(config.personas)} persona(s)).")
+    if not args.yes:
+        answer = input("Proceed? [y/N] ").strip().lower()
+        if answer != "y":
+            print("Aborted.")
+            sys.exit(0)
 
     client = anthropic.Anthropic()
 
