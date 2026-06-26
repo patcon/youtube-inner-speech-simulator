@@ -265,6 +265,7 @@ def main() -> None:
     parser.add_argument("--only", metavar="PERSONA", nargs="+", help="Run only these persona name(s)")
     parser.add_argument("--max-time", type=float, metavar="SECONDS", help="Only process cues up to this timestamp (seconds)")
     parser.add_argument("--yes", "-y", action="store_true", help="Skip confirmation prompt")
+    parser.add_argument("--dry-run", "-n", action="store_true", help="Estimate tokens and cost without generating any output")
     args = parser.parse_args()
 
     if not args.vtt.exists():
@@ -325,6 +326,10 @@ def main() -> None:
     # Approximate cost: Sonnet input $3/MTok, output $15/MTok
     est_cost = (total_input_tokens * 3 + total_output_tokens * 15) / 1_000_000
     print(f"done.\n  ~{total_input_tokens:,} input tokens, ~{total_output_tokens:,} max output tokens, ~${est_cost:.2f} estimated cost")
+
+    if args.dry_run:
+        print("Dry run — exiting without generating output.")
+        sys.exit(0)
 
     if not args.yes:
         answer = input("Proceed? [y/N] ").strip().lower()
