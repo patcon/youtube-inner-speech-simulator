@@ -456,7 +456,7 @@
         const cues = parseVtt(e.target.result);
         const idx = state.nextPersonaIndex;
         const persona = {
-          id: crypto.randomUUID(),
+          id: (crypto.randomUUID || (() => Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2)))(),
           name: deriveName(file.name),
           color: PALETTE[idx % PALETTE.length],
           cues,
