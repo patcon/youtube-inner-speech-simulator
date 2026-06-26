@@ -4,12 +4,14 @@
 # dependencies = [
 #   "anthropic",
 #   "pyyaml",
+#   "youtube-transcript-api",
 # ]
 # ///
 """
 Generate inner speech VTT streams for personas, seeded from a source VTT transcript.
 
 Usage:
+    uv run create_inner_speech.py https://youtube.com/watch?v=ID personas.yaml
     uv run create_inner_speech.py transcript.vtt personas.yaml --output-dir ./output
 """
 
@@ -23,6 +25,8 @@ from pathlib import Path
 
 import anthropic
 import yaml
+from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api.formatters import WebVTTFormatter
 
 
 # ---------------------------------------------------------------------------
@@ -75,7 +79,10 @@ def format_timestamp(seconds: float) -> str:
 
 
 def parse_vtt(path: Path) -> list[Cue]:
-    text = path.read_text(encoding="utf-8")
+    return parse_vtt_text(path.read_text(encoding="utf-8"))
+
+
+def parse_vtt_text(text: str) -> list[Cue]:
     lines = text.splitlines()
     cues: list[Cue] = []
     i = 0
@@ -130,6 +137,20 @@ def parse_vtt(path: Path) -> list[Cue]:
             i += 1
 
     return cues
+
+
+# ---------------------------------------------------------------------------
+# YouTube transcript fetching
+# ---------------------------------------------------------------------------
+
+def extract_video_id(url: str) -> str | None:
+    m = re.search(r'(?:v=|youtu\.be/|embed/|shorts/)([A-Za-z0-9_-]{11})', url)
+    return m.group(1) if m else None
+
+
+def fetch_youtube_vtt(video_id: str) -> str:
+    transcript = YouTubeTranscriptApi().fetch(video_id)
+    return WebVTTFormatter().format_transcript(transcript)
 
 
 # ---------------------------------------------------------------------------
@@ -243,6 +264,7 @@ def process_persona(
     output_dir: Path,
     verbose: bool,
     run_ts: str,
+    video_id: str | None = None,
 ) -> None:
     output_cues: list[tuple[float, float, str]] = []
     history_parts: list[str] = []
@@ -269,14 +291,15 @@ def process_persona(
         if verbose:
             print(f"  [{format_timestamp(cue.start)}] budget={budget}t | {thought[:80]}{'...' if len(thought) > 80 else ''}")
 
-    out_path = output_dir / f"inner_{persona.name}_{run_ts}.vtt"
+    vid_part = f"_{video_id}" if video_id else ""
+    out_path = output_dir / f"inner_{persona.name}{vid_part}_{run_ts}.vtt"
     write_vtt(output_cues, out_path)
     print(f"[{persona.name}] written to {out_path}")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate inner speech VTTs from a transcript.")
-    parser.add_argument("vtt", type=Path, help="Source VTT transcript file")
+    parser.add_argument("vtt", help="Source VTT file path or YouTube URL")
     parser.add_argument("personas", type=Path, help="Personas YAML config file")
     parser.add_argument("--output-dir", type=Path, default=Path("outputs"), help="Output directory")
     parser.add_argument("--verbose", "-v", action="store_true", help="Print each thought as it's generated")
@@ -288,9 +311,6 @@ def main() -> None:
     parser.add_argument("--dry-run", "-n", action="store_true", help="Estimate tokens and cost without generating any output")
     args = parser.parse_args()
 
-    if not args.vtt.exists():
-        print(f"Error: VTT file not found: {args.vtt}", file=sys.stderr)
-        sys.exit(1)
     if not args.personas.exists():
         print(f"Error: Personas file not found: {args.personas}", file=sys.stderr)
         sys.exit(1)
@@ -315,7 +335,24 @@ def main() -> None:
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    cues = parse_vtt(args.vtt)
+    video_id: str | None = None
+    if args.vtt.startswith("http://") or args.vtt.startswith("https://"):
+        video_id = extract_video_id(args.vtt)
+        if not video_id:
+            print(f"Error: could not extract a YouTube video ID from: {args.vtt}", file=sys.stderr)
+            sys.exit(1)
+        print(f"Fetching YouTube transcript for video ID: {video_id}")
+        vtt_text = fetch_youtube_vtt(video_id)
+        cues = parse_vtt_text(vtt_text)
+        source_name = video_id
+    else:
+        vtt_path = Path(args.vtt)
+        if not vtt_path.exists():
+            print(f"Error: VTT file not found: {vtt_path}", file=sys.stderr)
+            sys.exit(1)
+        cues = parse_vtt(vtt_path)
+        source_name = vtt_path.name
+
     if start_seconds is not None:
         cues = [c for c in cues if c.start >= start_seconds]
     if end_seconds is not None:
@@ -326,7 +363,7 @@ def main() -> None:
         lo = format_timestamp(start_seconds) if start_seconds is not None else "start"
         hi = format_timestamp(end_seconds) if end_seconds is not None else "end"
         range_desc = f" [{lo} → {hi}]"
-    print(f"Parsed {len(cues)} cues from {args.vtt.name}{range_desc}")
+    print(f"Parsed {len(cues)} cues from {source_name}{range_desc}")
 
     config = load_config(args.personas)
     if args.only:
@@ -384,6 +421,12 @@ def main() -> None:
             sys.exit(0)
 
     run_ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    if video_id:
+        transcript_path = args.output_dir / f"transcript_{video_id}_{run_ts}.vtt"
+        transcript_path.write_text(vtt_text, encoding="utf-8")
+        print(f"Saved original transcript to {transcript_path}")
+
     for persona in config.personas:
         process_persona(
             persona=persona,
@@ -393,6 +436,7 @@ def main() -> None:
             output_dir=args.output_dir,
             verbose=args.verbose,
             run_ts=run_ts,
+            video_id=video_id,
         )
 
     print("\nDone.")
