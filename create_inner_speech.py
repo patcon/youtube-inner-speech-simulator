@@ -14,6 +14,7 @@ Usage:
 """
 
 import argparse
+import datetime
 import os
 import re
 import sys
@@ -241,6 +242,7 @@ def process_persona(
     client: anthropic.Anthropic,
     output_dir: Path,
     verbose: bool,
+    run_ts: str,
 ) -> None:
     output_cues: list[tuple[float, float, str]] = []
     history_parts: list[str] = []
@@ -267,7 +269,7 @@ def process_persona(
         if verbose:
             print(f"  [{format_timestamp(cue.start)}] budget={budget}t | {thought[:80]}{'...' if len(thought) > 80 else ''}")
 
-    out_path = output_dir / f"inner_{persona.name}.vtt"
+    out_path = output_dir / f"inner_{persona.name}_{run_ts}.vtt"
     write_vtt(output_cues, out_path)
     print(f"[{persona.name}] written to {out_path}")
 
@@ -381,6 +383,7 @@ def main() -> None:
             print("Aborted.")
             sys.exit(0)
 
+    run_ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     for persona in config.personas:
         process_persona(
             persona=persona,
@@ -389,6 +392,7 @@ def main() -> None:
             client=client,
             output_dir=args.output_dir,
             verbose=args.verbose,
+            run_ts=run_ts,
         )
 
     print("\nDone.")
