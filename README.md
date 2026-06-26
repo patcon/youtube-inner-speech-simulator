@@ -6,6 +6,10 @@ Given a VTT transcript and a set of personas, this tool simulates what different
 
 The token budget for each thought is proportional to the duration of the transcript cue, so faster speech produces shorter thoughts and slower speech gives more room to reflect.
 
+## Getting a transcript
+
+Use [youtube-transcript.io](https://www.youtube-transcript.io/videos?id=WTHoQEea4dk) to download a VTT transcript from any YouTube video. Replace the `id=` parameter with your video's ID.
+
 ## Usage
 
 The script uses [uv](https://docs.astral.sh/uv/) inline metadata, so no separate install step is needed:
