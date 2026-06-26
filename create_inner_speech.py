@@ -192,7 +192,7 @@ def generate_inner_speech(
         budget=budget,
     )
     message = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
         max_tokens=budget,
         system=system,
         messages=[{"role": "user", "content": user}],
@@ -315,7 +315,7 @@ def main() -> None:
                 budget=budget,
             )
             result = client.messages.count_tokens(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 system=system,
                 messages=[{"role": "user", "content": user}],
             )
