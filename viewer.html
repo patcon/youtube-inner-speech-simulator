@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inner Speech Viewer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      background: #111;
+      color: #e8e8e8;
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      padding: 1rem;
+    }
+
+    #app {
+      max-width: 960px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    /* URL bar */
+    #url-bar {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    #yt-url {
+      flex: 1;
+      background: #1e1e1e;
+      border: 1px solid #333;
+      color: #e8e8e8;
+      padding: 0.5rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+
+    #yt-url::placeholder { color: #555; }
+    #yt-url:focus { outline: none; border-color: #555; }
+
+    button {
+      background: #2a2a2a;
+      border: 1px solid #444;
+      color: #e8e8e8;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.875rem;
+      white-space: nowrap;
+    }
+
+    button:hover { background: #333; border-color: #666; }
+
+    #url-error {
+      font-size: 0.8rem;
+      color: hsl(350, 75%, 60%);
+      display: none;
+    }
+
+    /* 16:9 player */
+    #player-wrapper {
+      position: relative;
+      padding-top: 56.25%;
+      background: #000;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    #player-wrapper iframe {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      border: 0;
+    }
+
+    #player-placeholder {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #444;
+      font-size: 0.9rem;
+    }
+
+    /* File controls */
+    #file-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .file-btn {
+      cursor: pointer;
+      background: #2a2a2a;
+      border: 1px solid #444;
+      color: #e8e8e8;
+      padding: 0.4rem 0.8rem;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      user-select: none;
+    }
+
+    .file-btn:hover { background: #333; border-color: #666; }
+
+    #persona-list {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .persona-chip {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.25rem 0.5rem 0.25rem 0.6rem;
+      border-radius: 999px;
+      border: 1px solid var(--chip-color);
+      font-size: 0.75rem;
+      color: var(--chip-color);
+      background: color-mix(in srgb, var(--chip-color) 10%, transparent);
+    }
+
+    .chip-remove {
+      background: none;
+      border: none;
+      color: var(--chip-color);
+      cursor: pointer;
+      padding: 0;
+      font-size: 1rem;
+      line-height: 1;
+      opacity: 0.7;
+    }
+
+    .chip-remove:hover { opacity: 1; background: none; border: none; }
+
+    /* Cue display area */
+    #cue-display {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    /* Original transcript zone */
+    #original-zone {
+      background: #1e1e2a;
+      border-left: 4px solid #888;
+      padding: 1rem 1.5rem;
+      min-height: 4rem;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    #original-label {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #888;
+      opacity: 0.7;
+    }
+
+    #original-cue {
+      font-size: 1.4rem;
+      line-height: 1.5;
+      color: #d0d0e8;
+    }
+
+    #original-cue:empty::before {
+      content: '—';
+      color: #3a3a50;
+    }
+
+    /* Persona grid */
+    #persona-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+
+    .persona-zone {
+      background: #1e1e1e;
+      border-left: 4px solid var(--persona-color);
+      border-radius: 4px;
+      padding: 0.75rem 1rem;
+      min-height: 5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .persona-label {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--persona-color);
+      opacity: 0.8;
+    }
+
+    .persona-cue {
+      font-size: 1rem;
+      line-height: 1.5;
+      color: #d8d8d8;
+    }
+
+    .persona-cue:empty::before {
+      content: '—';
+      color: #333;
+    }
+
+    @media (max-width: 600px) {
+      #persona-grid {
+        grid-template-columns: 1fr;
+      }
+      .persona-zone {
+        grid-column: 1 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+
+    <div>
+      <div id="url-bar">
+        <input type="text" id="yt-url" placeholder="YouTube URL…" />
+        <button id="load-video-btn">Load Video</button>
+      </div>
+      <div id="url-error"></div>
+    </div>
+
+    <div id="player-wrapper">
+      <div id="player-placeholder">Paste a YouTube URL above and click Load Video</div>
+    </div>
+
+    <div id="file-controls">
+      <label class="file-btn">
+        Load Original VTT
+        <input type="file" id="original-vtt-input" accept=".vtt,.srt,text/plain" hidden>
+      </label>
+      <label class="file-btn">
+        Add Persona VTT
+        <input type="file" id="persona-vtt-input" accept=".vtt,.srt,text/plain" hidden>
+      </label>
+      <div id="persona-list"></div>
+    </div>
+
+    <div id="cue-display">
+      <div id="original-zone">
+        <span id="original-label">Original Transcript</span>
+        <span id="original-cue"></span>
+      </div>
+      <div id="persona-grid"></div>
+    </div>
+
+  </div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script>
+    // ── State ────────────────────────────────────────────────────────────────
+    const state = {
+      player: null,
+      pollTimer: null,
+      originalCues: [],
+      personas: [],
+      nextPersonaIndex: 0,
+    };
+
+    const PALETTE = [
+      'hsl(220,80%,60%)',
+      'hsl(30,85%,58%)',
+      'hsl(120,60%,52%)',
+      'hsl(280,70%,65%)',
+      'hsl(60,80%,55%)',
+      'hsl(180,65%,50%)',
+      'hsl(350,75%,60%)',
+      'hsl(160,60%,52%)',
+    ];
+
+    // ── VTT Parsing ──────────────────────────────────────────────────────────
+    function parseTimestamp(ts) {
+      ts = ts.trim().replace(',', '.');
+      const parts = ts.split(':');
+      if (parts.length === 3) return +parts[0] * 3600 + +parts[1] * 60 + parseFloat(parts[2]);
+      if (parts.length === 2) return +parts[0] * 60 + parseFloat(parts[1]);
+      return 0;
+    }
+
+    function parseVtt(text) {
+      const lines = text.replace(/\r/g, '').split('\n');
+      const cues = [];
+      let i = 0;
+
+      // Skip header and leading blank lines
+      while (i < lines.length && (lines[i].startsWith('WEBVTT') || lines[i].trim() === '')) i++;
+
+      while (i < lines.length) {
+        const line = lines[i].trim();
+
+        // Skip blank lines
+        if (line === '') { i++; continue; }
+
+        // Skip NOTE blocks
+        if (line.startsWith('NOTE')) {
+          i++;
+          while (i < lines.length && lines[i].trim() !== '') i++;
+          continue;
+        }
+
+        // Skip STYLE blocks
+        if (line.startsWith('STYLE')) {
+          i++;
+          while (i < lines.length && lines[i].trim() !== '') i++;
+          continue;
+        }
+
+        // Timing line?
+        if (line.includes('-->')) {
+          const [startStr, endStr] = line.split('-->').map(s => s.trim().split(' ')[0]);
+          const start = parseTimestamp(startStr);
+          const end = parseTimestamp(endStr);
+          i++;
+
+          const payloadLines = [];
+          while (i < lines.length && lines[i].trim() !== '') {
+            payloadLines.push(lines[i].trim());
+            i++;
+          }
+
+          const rawText = payloadLines.join(' ');
+          const cleanText = rawText.replace(/<[^>]+>/g, '').trim();
+
+          if (cleanText) cues.push({ start, end, text: cleanText });
+          continue;
+        }
+
+        // Cue identifier line (numeric or arbitrary ID) — skip it
+        i++;
+      }
+
+      return cues;
+    }
+
+    function findActiveCue(cues, t) {
+      return cues.find(c => t >= c.start && t < c.end) || null;
+    }
+
+    // ── YouTube ──────────────────────────────────────────────────────────────
+    function extractVideoId(url) {
+      const m = url.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([A-Za-z0-9_-]{11})/);
+      return m ? m[1] : null;
+    }
+
+    // Called by YouTube IFrame API when ready
+    function onYouTubeIframeAPIReady() {
+      // No-op — player created on demand
+    }
+
+    function loadVideo() {
+      const url = document.getElementById('yt-url').value.trim();
+      const errEl = document.getElementById('url-error');
+      const videoId = extractVideoId(url);
+
+      if (!videoId) {
+        errEl.textContent = 'Could not find a YouTube video ID in that URL.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      errEl.style.display = 'none';
+
+      if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
+      if (state.player) { state.player.destroy(); state.player = null; }
+
+      const wrapper = document.getElementById('player-wrapper');
+      wrapper.innerHTML = '<div id="yt-player"></div>';
+
+      state.player = new YT.Player('yt-player', {
+        videoId,
+        playerVars: { autoplay: 0, rel: 0, modestbranding: 1 },
+        events: {
+          onReady: () => {
+            state.pollTimer = setInterval(() => {
+              if (state.player && typeof state.player.getCurrentTime === 'function') {
+                updateDisplay(state.player.getCurrentTime());
+              }
+            }, 250);
+          },
+        },
+      });
+    }
+
+    // ── Display ──────────────────────────────────────────────────────────────
+    function updateDisplay(t) {
+      const origCue = findActiveCue(state.originalCues, t);
+      document.getElementById('original-cue').textContent = origCue ? origCue.text : '';
+
+      for (const persona of state.personas) {
+        const cue = findActiveCue(persona.cues, t);
+        const el = document.getElementById('persona-cue-' + persona.id);
+        if (el) el.textContent = cue ? cue.text : '';
+      }
+    }
+
+    // ── Persona Management ───────────────────────────────────────────────────
+    function deriveName(filename) {
+      return filename
+        .replace(/^.*[/\\]/, '')
+        .replace(/\.vtt$/i, '')
+        .replace(/^inner_/, '')
+        .replace(/_\d{8}_\d{6}$/, '')
+        .replace(/[_-]/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    function renderPersonaCard(persona) {
+      const card = document.createElement('div');
+      card.className = 'persona-zone';
+      card.id = 'persona-zone-' + persona.id;
+      card.style.setProperty('--persona-color', persona.color);
+      card.style.gridColumn = persona.column === 'left' ? '1' : '2';
+      card.innerHTML = `
+        <span class="persona-label">${persona.name}</span>
+        <span class="persona-cue" id="persona-cue-${persona.id}"></span>
+      `;
+      document.getElementById('persona-grid').appendChild(card);
+    }
+
+    function renderPersonaChip(persona) {
+      const chip = document.createElement('div');
+      chip.className = 'persona-chip';
+      chip.id = 'chip-' + persona.id;
+      chip.style.setProperty('--chip-color', persona.color);
+      chip.innerHTML = `
+        <span>${persona.name}</span>
+        <button class="chip-remove" title="Remove persona" data-id="${persona.id}">×</button>
+      `;
+      document.getElementById('persona-list').appendChild(chip);
+    }
+
+    function addPersona(file) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const cues = parseVtt(e.target.result);
+        const idx = state.nextPersonaIndex;
+        const persona = {
+          id: crypto.randomUUID(),
+          name: deriveName(file.name),
+          color: PALETTE[idx % PALETTE.length],
+          cues,
+          column: idx % 2 === 0 ? 'left' : 'right',
+        };
+        state.personas.push(persona);
+        state.nextPersonaIndex++;
+        renderPersonaCard(persona);
+        renderPersonaChip(persona);
+      };
+      reader.readAsText(file);
+    }
+
+    function removePersona(id) {
+      state.personas = state.personas.filter(p => p.id !== id);
+      const card = document.getElementById('persona-zone-' + id);
+      if (card) card.remove();
+      const chip = document.getElementById('chip-' + id);
+      if (chip) chip.remove();
+    }
+
+    // ── Event Listeners ──────────────────────────────────────────────────────
+    document.getElementById('load-video-btn').addEventListener('click', loadVideo);
+
+    document.getElementById('yt-url').addEventListener('keydown', e => {
+      if (e.key === 'Enter') loadVideo();
+    });
+
+    document.getElementById('original-vtt-input').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        state.originalCues = parseVtt(ev.target.result);
+        const label = document.getElementById('original-label');
+        label.textContent = deriveName(file.name) || 'Original Transcript';
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    });
+
+    document.getElementById('persona-vtt-input').addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      addPersona(file);
+      e.target.value = '';
+    });
+
+    document.getElementById('persona-list').addEventListener('click', e => {
+      const btn = e.target.closest('.chip-remove');
+      if (btn) removePersona(btn.dataset.id);
+    });
+  </script>
+</body>
+</html>
