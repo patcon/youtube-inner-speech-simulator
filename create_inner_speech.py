@@ -296,13 +296,40 @@ def main() -> None:
 
     total_calls = len(cues) * len(config.personas)
     print(f"\nThis will make {total_calls} API call(s) ({len(cues)} cues × {len(config.personas)} persona(s)).")
+
+    print("Estimating token usage...", end=" ", flush=True)
+    client = anthropic.Anthropic()
+    total_input_tokens = 0
+    total_output_tokens = 0
+    for persona in config.personas:
+        history_parts: list[str] = []
+        for cue in cues:
+            duration = cue.end - cue.start
+            budget = int(duration * config.tokens_per_second)
+            budget = max(config.min_tokens, min(config.max_tokens, budget))
+            system = SYSTEM_TEMPLATE.format(persona_prompt=persona.prompt)
+            user = USER_TEMPLATE.format(
+                history=" ".join(history_parts) if history_parts else "(nothing yet)",
+                current=cue.text,
+                budget=budget,
+            )
+            result = client.messages.count_tokens(
+                model="claude-sonnet-4-20250514",
+                system=system,
+                messages=[{"role": "user", "content": user}],
+            )
+            total_input_tokens += result.input_tokens
+            total_output_tokens += budget
+            history_parts.append(cue.text)
+    # Approximate cost: Sonnet input $3/MTok, output $15/MTok
+    est_cost = (total_input_tokens * 3 + total_output_tokens * 15) / 1_000_000
+    print(f"done.\n  ~{total_input_tokens:,} input tokens, ~{total_output_tokens:,} max output tokens, ~${est_cost:.2f} estimated cost")
+
     if not args.yes:
         answer = input("Proceed? [y/N] ").strip().lower()
         if answer != "y":
             print("Aborted.")
             sys.exit(0)
-
-    client = anthropic.Anthropic()
 
     for persona in config.personas:
         process_persona(
