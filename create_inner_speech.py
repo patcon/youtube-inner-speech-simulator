@@ -14,6 +14,7 @@ Usage:
 """
 
 import argparse
+import os
 import re
 import sys
 from dataclasses import dataclass, field
@@ -263,6 +264,9 @@ def main() -> None:
     parser.add_argument("--verbose", "-v", action="store_true", help="Print each thought as it's generated")
     args = parser.parse_args()
 
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        print("Error: ANTHROPIC_API_KEY is not set. Get a key at https://console.anthropic.com/ and run:\n  export ANTHROPIC_API_KEY=sk-...", file=sys.stderr)
+        sys.exit(1)
     if not args.vtt.exists():
         print(f"Error: VTT file not found: {args.vtt}", file=sys.stderr)
         sys.exit(1)
