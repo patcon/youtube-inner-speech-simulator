@@ -49,6 +49,22 @@ def parse_timestamp(ts: str) -> float:
     raise ValueError(f"Unrecognised timestamp: {ts!r}")
 
 
+def parse_youtube_timecode(tc: str) -> float:
+    """Convert YouTube-style HH:MM:SS or MM:SS (whole seconds) to seconds."""
+    tc = tc.strip()
+    parts = tc.split(":")
+    try:
+        if len(parts) == 3:
+            h, m, s = parts
+            return int(h) * 3600 + int(m) * 60 + int(s)
+        elif len(parts) == 2:
+            m, s = parts
+            return int(m) * 60 + int(s)
+    except ValueError:
+        pass
+    raise ValueError(f"Unrecognised timecode: {tc!r} (expected MM:SS or HH:MM:SS)")
+
+
 def format_timestamp(seconds: float) -> str:
     """Format seconds as HH:MM:SS.mmm for VTT output."""
     h = int(seconds // 3600)
@@ -263,7 +279,9 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, default=Path("outputs"), help="Output directory")
     parser.add_argument("--verbose", "-v", action="store_true", help="Print each thought as it's generated")
     parser.add_argument("--only", metavar="PERSONA", nargs="+", help="Run only these persona name(s)")
-    parser.add_argument("--max-time", type=float, metavar="SECONDS", help="Only process cues up to this timestamp (seconds)")
+    parser.add_argument("--max-time", type=float, metavar="SECONDS", help="Stop this many seconds after --start-timecode (or from the beginning if not set)")
+    parser.add_argument("--start-timecode", metavar="TIMECODE", help="Start from this timecode (MM:SS or HH:MM:SS); continues to end unless --end-timecode or --max-time set")
+    parser.add_argument("--end-timecode", metavar="TIMECODE", help="Stop at this absolute timecode (MM:SS or HH:MM:SS)")
     parser.add_argument("--yes", "-y", action="store_true", help="Skip confirmation prompt")
     parser.add_argument("--dry-run", "-n", action="store_true", help="Estimate tokens and cost without generating any output")
     args = parser.parse_args()
@@ -275,12 +293,38 @@ def main() -> None:
         print(f"Error: Personas file not found: {args.personas}", file=sys.stderr)
         sys.exit(1)
 
+    # Parse YouTube-style timecodes into seconds
+    start_seconds: float | None = None
+    end_seconds: float | None = None
+    try:
+        if args.start_timecode:
+            start_seconds = parse_youtube_timecode(args.start_timecode)
+        if args.end_timecode:
+            end_seconds = parse_youtube_timecode(args.end_timecode)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    if args.max_time is not None:
+        effective_start = start_seconds if start_seconds is not None else 0.0
+        max_time_end = effective_start + args.max_time
+        if end_seconds is None or max_time_end < end_seconds:
+            end_seconds = max_time_end
+
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     cues = parse_vtt(args.vtt)
-    if args.max_time is not None:
-        cues = [c for c in cues if c.start < args.max_time]
-    print(f"Parsed {len(cues)} cues from {args.vtt.name}" + (f" (capped at {args.max_time}s)" if args.max_time else ""))
+    if start_seconds is not None:
+        cues = [c for c in cues if c.start >= start_seconds]
+    if end_seconds is not None:
+        cues = [c for c in cues if c.start < end_seconds]
+
+    range_desc = ""
+    if start_seconds is not None or end_seconds is not None:
+        lo = format_timestamp(start_seconds) if start_seconds is not None else "start"
+        hi = format_timestamp(end_seconds) if end_seconds is not None else "end"
+        range_desc = f" [{lo} → {hi}]"
+    print(f"Parsed {len(cues)} cues from {args.vtt.name}{range_desc}")
 
     config = load_config(args.personas)
     if args.only:
