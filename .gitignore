@@ -1,3 +1,4 @@
 outputs/
 *.vtt
 !transcripts/samples/*.vtt
+node_modules/
